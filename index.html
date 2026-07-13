@@ -267,6 +267,7 @@
     <div class="eyebrow">Bien-être</div>
     <h1>Routine du dos</h1>
     <div class="progress-track" id="progressTrack"></div>
+    <div id="lockStatus" style="font-size:11px;color:#8a9684;margin-top:8px;">v3 · anti-veille inactif</div>
   </div>
 
   <div class="stage" id="stage">
@@ -499,18 +500,30 @@ function tick() {
 /* --- Wake Lock : empêche la mise en veille de l'écran pendant la séance --- */
 let wakeLock = null;
 
+function setLockStatus(txt) {
+  const el = document.getElementById('lockStatus');
+  if (el) el.textContent = 'v3 · ' + txt;
+}
+
 async function acquireWakeLock() {
-  if (!('wakeLock' in navigator)) return;
+  if (!('wakeLock' in navigator)) { setLockStatus('Wake Lock non supporté'); return; }
   try {
     wakeLock = await navigator.wakeLock.request('screen');
-    wakeLock.addEventListener('release', () => { wakeLock = null; });
-  } catch (e) { /* refusé (batterie faible, etc.) : on continue sans */ }
+    setLockStatus('anti-veille actif (Wake Lock)');
+    wakeLock.addEventListener('release', () => {
+      wakeLock = null;
+      if (running) setLockStatus('anti-veille actif (vidéo seule)');
+    });
+  } catch (e) {
+    setLockStatus('Wake Lock refusé (' + e.name + ') · vidéo seule');
+  }
 }
 
 function releaseWakeLock() {
   if (wakeLock) { wakeLock.release(); wakeLock = null; }
   const v = document.getElementById('noSleepVideo');
-  if (v) v.pause();
+  if (v) { v.onpause = null; v.pause(); }
+  setLockStatus('anti-veille inactif');
 }
 
 /* --- Bip de fin (Web Audio, initialise au premier appui sur Lancer) --- */
